@@ -1,77 +1,82 @@
-# --- GİRİŞ BİLGİLERİ ---
-HANDLE = 'becaecosystem.bsky.social'  
-PASSWORD = '4z3v-advq-dqkd-fro2'       
+import time
+from atproto import Client
 
-# --- BEYAZ LİSTE ---
-WHITE_LIST = ['bsky.app', 'python.org', 'gemini.google.com']
+# --- KULLANICI BİLGİLERİ ---
+HANDLE = 'becaecosystem.bsky.social'
+PASSWORD = '7w6j-y5b2-rftg-hl5g' # Küçük harf olarak güncellendi
 
-client = Client()
-
-def beca_operasyonu():
+def beca_sky_final_scan():
+    client = Client()
     try:
-        print("🚀 Beca Ekosistem Görevlisi Bağlanıyor...")
+        print("🔑 Giriş yapılıyor...")
         client.login(HANDLE, PASSWORD)
         
-        print("🔍 Analiz yapılıyor, lütfen bekleyin...")
-        
-        # Takip ettiklerini çek
-        following = []
+        # 1. TAKİPÇİLER (Seni takip edenler)
+        follower_dids = set()
         cursor = None
+        print("📥 Takipçiler çekiliyor...")
         while True:
-            res = client.get_follows(actor=HANDLE, cursor=cursor)
-            following.extend(res.follows)
-            if not res.cursor: break
-            cursor = res.cursor
+            f_resp = client.get_followers(actor=HANDLE, cursor=cursor)
+            for f in f_resp.followers:
+                follower_dids.add(f.did)
+            cursor = f_resp.cursor
+            if not cursor: break
+            time.sleep(0.3)
 
-        # Takipçilerini çek
-        followers = set()
+        # 2. TAKİP EDİLENLER (Derin Tarama - 3900+ aranıyor)
+        following_list = []
         cursor = None
+        print("📥 Takip edilenler çekiliyor (Son kişiye kadar)...")
         while True:
-            res = client.get_followers(actor=HANDLE, cursor=cursor)
-            for f in res.followers: followers.add(f.did)
-            if not res.cursor: break
-            cursor = res.cursor
+            try:
+                fg_resp = client.get_follows(actor=HANDLE, cursor=cursor)
+                following_list.extend(fg_resp.follows)
+                print(f"--- Şu ana kadar {len(following_list)} hesap bulundu...")
+                cursor = fg_resp.cursor
+                if not cursor: break
+                time.sleep(0.3) 
+            except Exception as e:
+                print(f"⚠️ Sunucu yanıt vermedi, tekrar deneniyor: {e}")
+                time.sleep(2)
+                continue
 
-        # Hainleri bul (Seni takip etmeyenler)
-        hainler = [f for f in following if f.did not in followers and f.handle not in WHITE_LIST]
+        # 3. ANALİZ VE GRUPLAMA
+        dostlar = []
+        takip_etmeyenler = []
 
-        # --- İMZAN VE EKRAN ÇIKTISI ---
-        print("\n" + "="*60)
-        print("🌟 BECA EKOSİSTEMİ SOSYAL YÖNETİM ASİSTANI")
-        print("beca ekosistem sahibi ilknur ergin tarafından geliştirilmiştir.")
-        print("="*60)
+        for user in following_list:
+            isim_satiri = f"{user.handle} ({user.display_name or 'İsimsiz'})"
+            if user.did in follower_dids:
+                dostlar.append(isim_satiri)
+            else:
+                takip_etmeyenler.append(isim_satiri)
 
-        print(f"\n✅ Analiz Tamamlandı!")
-        print(f"Toplam Takip Ettiklerin: {len(following)}")
-        print(f"Seni Takip Edenler: {len(followers)}")
-        print(f"Seni Geri Takip Etmeyen: {len(hainler)}")
+        # 4. DOSYAYA YAZDIRMA
+        filename = "FULL_EKOSISTEM_RAPORU.txt"
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(f"--- BECA ECOSYSTEM NİHAİ TARAMA RAPORU ---\n")
+            f.write(f"Tarih: {time.ctime()}\n")
+            f.write(f"Profilde Görünen Takip Edilen: ~3900\n")
+            f.write(f"Kodun Çekebildiği Toplam: {len(following_list)}\n")
+            f.write(f"Kayıp/Hayalet Sayısı: {3900 - len(following_list)}\n")
+            f.write(f"Toplam Takipçi Sayın: {len(follower_dids)}\n")
+            f.write("="*60 + "\n\n")
 
-        if not hainler:
-            print("\nEkosisteminiz tertemiz! İşleme gerek yok.")
-            return
+            f.write(f"❌ SENİ GERİ TAKİP ETMEYENLER ({len(takip_etmeyenler)} Kişi)\n")
+            f.write("-" * 40 + "\n")
+            for i, isim in enumerate(takip_etmeyenler, 1):
+                f.write(f"{i}. {isim}\n")
 
-        print(f"\n⚠️ KARAR ANI: Bu {len(hainler)} kişiyi 2 saniye arayla silmemi ister misiniz?")
-        secim = input("Onaylıyor musunuz? (evet / hayır): ")
+            f.write("\n\n✅ KARŞILIKLI TAKİPLEŞTİĞİN DOSTLAR ({len(dostlar)} Kişi)\n")
+            f.write("-" * 40 + "\n")
+            for i, isim in enumerate(dostlar, 1):
+                f.write(f"{i}. {isim}\n")
 
-        if secim.lower() == 'evet':
-            print(f"\n🔥 Operasyon başladı. İnternet kopsa bile sistem bekleyecektir.")
-            for index, kisi in enumerate(hainler, 1):
-                while True: # İNATÇI DÖNGÜ: İnternet gelene kadar dener
-                    try:
-                        client.delete_follow(kisi.viewer.following)
-                        print(f"[{index}/{len(hainler)}] 🗑️ Silindi: {kisi.handle}")
-                        time.sleep(2) # Güvenli bekleme süresi
-                        break # Başarılıysa döngüden çık, sıradakine geç
-                    except Exception as e:
-                        print(f"⚠️ Bağlantı sorunu! 10 saniye sonra tekrar denenecek... (Hata: {e})")
-                        time.sleep(10)
-            
-            print("\n✨ Beca Ekosistem Görevlisi işini başarıyla tamamladı!")
-        else:
-            print("\nOperasyon iptal edildi. Kimse silinmedi.")
+        print(f"\n✨ BAŞARILI! '{filename}' dosyası oluşturuldu.")
+        print(f"👉 Şimdi o dosyayı aç ve o hayalet 110 kişinin farkını isim isim incele!")
 
     except Exception as e:
-        print(f"❌ Kritik bir hata oluştu: {e}")
+        print(f"❌ Hata: {e}")
 
-if _name_ == "_main_":
-    beca_operasyonu()
+if __name__ == "__main__":
+    beca_sky_final_scan()
