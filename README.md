@@ -21,6 +21,7 @@ Beca-Sky, Bluesky hesap analizi ve takipçi yönetimi için tasarlanmış Python
 
 - Bilgisayarınızda Python 3.x yüklü olmalıdır.
 - Bluesky hesabınızdan alınmış bir Uygulama Şifresi (App Password) gereklidir.
+- Şifre kısmına kendi şifrenizi yazın.
 
 ### Kurulum
  Depoyu klonlayın:
